@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Create Invoice</title>
+</head>
+<body>
+    <h1>Create Invoice</h1>
+    <form method="POST">
+        <label>Customer Name:</label><br>
+        <input type="text" name="customer_name" required><br><br>
+
+        <label>Product:</label><br>
+        <input type="text" name="product" required><br><br>
+
+        <label>Quantity:</label><br>
+        <input type="number" name="quantity" required><br><br>
+
+        <label>Price:</label><br>
+        <input type="number" name="price" step="0.01" required><br><br>
+
+        <button type="submit">Generate Invoice</button>
+    </form>
+</body>
+</html>
