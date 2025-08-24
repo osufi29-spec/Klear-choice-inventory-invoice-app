@@ -29,10 +29,9 @@ class Invoice(db.Model):
     paid = db.Column(db.Boolean, default=False)
 
 # ------------------ INIT ------------------ #
-@app.before_first_request
-def create_tables():
-    db.create_all()
 
+with app.app_context():
+    db.create_all()
 # ------------------ ROUTES ------------------ #
 
 @app.route("/")
