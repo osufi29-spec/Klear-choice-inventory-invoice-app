@@ -1,86 +1,109 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
 import os
+import json
 
+# ---------------- APP CONFIG ---------------- #
 app = Flask(__name__)
-
-# Secret key for session management
 app.secret_key = "your_secret_key"
 
-# Database configuration
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(BASE_DIR, 'database.db')
+DATABASE_URL = os.environ.get("DATABASE_URL") or "sqlite:///" + os.path.join(BASE_DIR, "database.db")
+
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# --------------------------------
-# Database Model
-# --------------------------------
-class Product(db.Model):
+# ---------------- MODELS ---------------- #
+class Item(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False)
-    price = db.Column(db.Float, nullable=False)
-    quantity = db.Column(db.Integer, nullable=False)
+    name = db.Column(db.String(120), nullable=False)
+    price = db.Column(db.Integer, nullable=False)  # stored in paisa
+    quantity = db.Column(db.Integer, default=0)
 
-    def __repr__(self):
-        return f"<Product {self.name}>"
+class Invoice(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    customer_name = db.Column(db.String(200))
+    total_amount = db.Column(db.Integer, nullable=False)  # in paisa
+    paid = db.Column(db.Boolean, default=False)
 
-# --------------------------------
-# Database Initialization (Fixed)
-# --------------------------------
+# ---------------- INIT DB ---------------- #
 with app.app_context():
     db.create_all()
 
-# --------------------------------
-# Routes
-# --------------------------------
+# ---------------- ROUTES ---------------- #
 
-# Home page
+# Home Page
 @app.route("/")
-def index():
-    products = Product.query.all()
-    return render_template("index.html", products=products)
+def home():
+    items = Item.query.all()
+    invoices = Invoice.query.order_by(Invoice.created_at.desc()).limit(5).all()
+    return render_template("index.html", items=items, invoices=invoices)
 
-# Add Product
-@app.route("/add", methods=["POST"])
-def add_product():
-    name = request.form['name']
-    price = request.form['price']
-    quantity = request.form['quantity']
+# Add Item
+@app.route("/add_item", methods=["POST"])
+def add_item():
+    name = request.form.get("name")
+    price = int(float(request.form.get("price")) * 100)  # convert to paisa
+    qty = int(request.form.get("quantity"))
 
-    if name and price and quantity:
-        new_product = Product(name=name, price=float(price), quantity=int(quantity))
-        db.session.add(new_product)
-        db.session.commit()
-        flash("Product added successfully!", "success")
-    else:
-        flash("All fields are required!", "danger")
-
-    return redirect(url_for("index"))
-
-# Delete Product
-@app.route("/delete/<int:id>")
-def delete_product(id):
-    product = Product.query.get_or_404(id)
-    db.session.delete(product)
+    item = Item(name=name, price=price, quantity=qty)
+    db.session.add(item)
     db.session.commit()
-    flash("Product deleted successfully!", "success")
-    return redirect(url_for("index"))
+    flash("Item added successfully!", "success")
+    return redirect(url_for("home"))
 
-# Update Product
-@app.route("/update/<int:id>", methods=["POST"])
-def update_product(id):
-    product = Product.query.get_or_404(id)
-    product.name = request.form['name']
-    product.price = float(request.form['price'])
-    product.quantity = int(request.form['quantity'])
+# Create Invoice
+@app.route("/create_invoice", methods=["POST"])
+def create_invoice():
+    customer = request.form.get("customer_name", "Walk-in")
+    items_json = json.loads(request.form.get("items_json", "[]"))
+
+    total = sum(int(item['price']) * int(item['qty']) for item in items_json)
+    inv = Invoice(customer_name=customer, total_amount=total, paid=False)
+    db.session.add(inv)
     db.session.commit()
-    flash("Product updated successfully!", "success")
-    return redirect(url_for("index"))
 
-# --------------------------------
-# Run the app
-# --------------------------------
+    return redirect(url_for("invoice_view", invoice_id=inv.id))
+
+# View Invoice
+@app.route("/invoice/<int:invoice_id>")
+def invoice_view(invoice_id):
+    inv = Invoice.query.get_or_404(invoice_id)
+
+    # Change your payment details here
+    gpay_id = "yourgpay@upi"
+    bank_name = "J&K Bank"
+    acc_no = "1234567890"
+    ifsc = "JAKA0XXXXXX"
+
+    return render_template(
+        "invoice.html",
+        invoice=inv,
+        gpay_id=gpay_id,
+        bank_name=bank_name,
+        acc_no=acc_no,
+        ifsc=ifsc
+    )
+
+# Mark Invoice as Paid
+@app.route("/mark_paid/<int:invoice_id>", methods=["POST"])
+def mark_paid(invoice_id):
+    inv = Invoice.query.get_or_404(invoice_id)
+    inv.paid = True
+    db.session.commit()
+    flash("Invoice marked as paid!", "success")
+    return redirect(url_for("invoice_view", invoice_id=invoice_id))
+
+# Success Page (optional)
+@app.route("/success/<int:invoice_id>")
+def success(invoice_id):
+    inv = Invoice.query.get_or_404(invoice_id)
+    return render_template("success.html", invoice=inv)
+
+# ---------------- RUN ---------------- #
 if __name__ == "__main__":
     app.run(debug=True)
