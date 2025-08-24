@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice</title>
+</head>
+<body>
+    <h1>Invoice</h1>
+    <p>Customer: {{ customer }}</p>
+    <p>Total Amount: ₹{{ total }}</p>
+    <p>Payment Mode: {{ payment }}</p>
+
+    {% if payment == "GPay" %}
+        <p>Pay via GPay: <b>gpay-id@okaxis</b></p>
+    {% else %}
+        <p>Bank Transfer Details:</p>
+        <p>Account Number: <b>1234567890</b></p>
+        <p>IFSC: <b>HDFC0001234</b></p>
+    {% endif %}
+
+    <form action="/mark_paid" method="post">
+        <input type="hidden" name="customer" value="{{ customer }}">
+        <button type="submit">Mark as Paid</button>
+    </form>
+</body>
+</html>
